@@ -1,19 +1,22 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/vira/go-crud/entities"
+	"github.com/vira/go-crud/response"
 	"github.com/vira/go-crud/services"
+	"github.com/vira/go-crud/utils"
 )
 
 type ReviewHandler struct {
-	service services.ReviewService
+	service *services.ReviewService
 }
 
-func NewReviewHandler(service services.ReviewService) *ReviewHandler {
+func NewReviewHandler(service *services.ReviewService) *ReviewHandler {
 	return &ReviewHandler{service}
 }
 
@@ -23,107 +26,108 @@ func (h *ReviewHandler) GetAll(c *gin.Context) {
 	if bookIDStr := c.Query("book_id"); bookIDStr != "" {
 		bookID, err := strconv.Atoi(bookIDStr)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid book_id"})
+			response.RespondError(c, http.StatusBadRequest, "invalid book_id")
 			return
 		}
 		reviews, err := h.service.GetByBookID(bookID)
 		if err != nil {
 			status := http.StatusInternalServerError
-			if err.Error() == "book not found" {
+			if errors.Is(err, services.ErrBookNotFound) {
 				status = http.StatusNotFound
 			}
-			c.JSON(status, gin.H{"error": err.Error()})
+			response.RespondError(c, status, err.Error())
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"data": reviews})
+		response.RespondSuccess(c, http.StatusOK, reviews)
 		return
 	}
 
 	reviews, err := h.service.GetAll()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"data": reviews})
+	response.RespondSuccess(c, http.StatusOK, reviews)
 }
 
 // GET /reviews/:id
 func (h *ReviewHandler) GetByID(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+	id, ok := utils.ParseIDParam(c)
+	if !ok {
 		return
 	}
 
 	review, err := h.service.GetByID(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		status := http.StatusInternalServerError
+		if errors.Is(err, services.ErrReviewNotFound) {
+			status = http.StatusNotFound
+		}
+		response.RespondError(c, status, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"data": review})
+	response.RespondSuccess(c, http.StatusOK, review)
 }
 
 // POST /reviews
 func (h *ReviewHandler) Create(c *gin.Context) {
 	var req entities.CreateReviewRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	review, err := h.service.Create(req)
 	if err != nil {
 		status := http.StatusInternalServerError
-		if err.Error() == "book not found" {
+		if errors.Is(err, services.ErrBookNotFound) {
 			status = http.StatusNotFound
 		}
-		c.JSON(status, gin.H{"error": err.Error()})
+		response.RespondError(c, status, err.Error())
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"data": review})
+	response.RespondSuccess(c, http.StatusCreated, review)
 }
 
 // PUT /reviews/:id
 func (h *ReviewHandler) Update(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+	id, ok := utils.ParseIDParam(c)
+	if !ok {
 		return
 	}
 
 	var req entities.UpdateReviewRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	review, err := h.service.Update(id, req)
 	if err != nil {
 		status := http.StatusInternalServerError
-		if err.Error() == "review not found" {
+		if errors.Is(err, services.ErrReviewNotFound) {
 			status = http.StatusNotFound
 		}
-		c.JSON(status, gin.H{"error": err.Error()})
+		response.RespondError(c, status, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"data": review})
+	response.RespondSuccess(c, http.StatusOK, review)
 }
 
 // DELETE /reviews/:id
 func (h *ReviewHandler) Delete(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+	id, ok := utils.ParseIDParam(c)
+	if !ok {
 		return
 	}
 
 	if err := h.service.Delete(id); err != nil {
 		status := http.StatusInternalServerError
-		if err.Error() == "review not found" {
+		if errors.Is(err, services.ErrReviewNotFound) {
 			status = http.StatusNotFound
 		}
-		c.JSON(status, gin.H{"error": err.Error()})
+		response.RespondError(c, status, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "review deleted"})
+	response.RespondSuccess(c, http.StatusOK, "review deleted")
 }

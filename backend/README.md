@@ -19,7 +19,9 @@ authors (1) --> books (1) --> reviews
 
 ```text
 backend/
-|-- main.go
+|-- cmd/
+|   `-- api/
+|       `-- main.go
 |-- config/
 |   `-- database.go
 |-- entities/
@@ -52,7 +54,24 @@ createdb go_crud
 psql go_crud < migrations/init.sql
 ```
 
-### 2. Set Environment Variables
+### 2. Configure Environment
+
+Backend akan mencoba membaca file `.env` secara otomatis saat startup.
+
+Contoh file `.env`:
+
+```env
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=go_crud
+DB_SSLMODE=disable
+DB_SEARCH_PATH=public
+CORS_ORIGIN=http://localhost:3000
+```
+
+Alternatifnya, env tetap bisa di-set manual dari shell.
 
 Contoh PowerShell:
 
@@ -68,15 +87,15 @@ $env:CORS_ORIGIN="http://localhost:3000"
 ```
 
 Catatan:
-- Backend ini tidak otomatis membaca file `.env`.
-- Env harus di-set di shell sebelum menjalankan `go run main.go`.
+- File `.env` bersifat opsional.
+- Environment variable dari shell tetap menimpa nilai dari `.env`.
 - `DB_SEARCH_PATH` sebaiknya `public` agar sesuai migration default.
 
 ### 3. Jalankan Backend
 
 ```bash
 go mod tidy
-go run main.go
+go run ./cmd/api
 ```
 
 Server:

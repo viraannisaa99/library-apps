@@ -5,30 +5,22 @@ import (
 	"github.com/vira/go-crud/entities"
 )
 
-type AuthorRepository interface {
-	FindAll() ([]entities.Author, error)
-	FindByID(id int) (*entities.Author, error)
-	Create(req entities.CreateAuthorRequest) (*entities.Author, error)
-	Update(id int, req entities.UpdateAuthorRequest) (*entities.Author, error)
-	Delete(id int) error
-}
-
-type authorRepository struct {
+type AuthorRepository struct {
 	db *sqlx.DB
 }
 
-func NewAuthorRepository(db *sqlx.DB) AuthorRepository {
-	return &authorRepository{db}
+func NewAuthorRepository(db *sqlx.DB) *AuthorRepository {
+	return &AuthorRepository{db}
 }
 
-func (r *authorRepository) FindAll() ([]entities.Author, error) {
+func (r *AuthorRepository) GetAll() ([]entities.Author, error) {
 	authors := []entities.Author{}
 	query := `SELECT * FROM authors ORDER BY id`
 	err := r.db.Select(&authors, query)
 	return authors, err
 }
 
-func (r *authorRepository) FindByID(id int) (*entities.Author, error) {
+func (r *AuthorRepository) GetByID(id int) (*entities.Author, error) {
 	author := &entities.Author{}
 	query := `SELECT * FROM authors WHERE id = $1`
 	err := r.db.Get(author, query, id)
@@ -38,7 +30,7 @@ func (r *authorRepository) FindByID(id int) (*entities.Author, error) {
 	return author, nil
 }
 
-func (r *authorRepository) Create(req entities.CreateAuthorRequest) (*entities.Author, error) {
+func (r *AuthorRepository) Create(req entities.CreateAuthorRequest) (*entities.Author, error) {
 	author := &entities.Author{}
 	query := `
 		INSERT INTO authors (name, email, bio)
@@ -48,7 +40,7 @@ func (r *authorRepository) Create(req entities.CreateAuthorRequest) (*entities.A
 	return author, err
 }
 
-func (r *authorRepository) Update(id int, req entities.UpdateAuthorRequest) (*entities.Author, error) {
+func (r *AuthorRepository) Update(id int, req entities.UpdateAuthorRequest) (*entities.Author, error) {
 	author := &entities.Author{}
 	query := `
 		UPDATE authors
@@ -62,7 +54,7 @@ func (r *authorRepository) Update(id int, req entities.UpdateAuthorRequest) (*en
 	return author, err
 }
 
-func (r *authorRepository) Delete(id int) error {
+func (r *AuthorRepository) Delete(id int) error {
 	_, err := r.db.Exec(`DELETE FROM authors WHERE id = $1`, id)
 	return err
 }

@@ -1,40 +1,20 @@
-package main
+package server
 
 import (
-	"log"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/vira/go-crud/config"
 	"github.com/vira/go-crud/handlers"
-	"github.com/vira/go-crud/repositories"
-	"github.com/vira/go-crud/services"
 )
 
-func main() {
-	// 1. Connect DB
-	db := config.NewDB()
-	defer db.Close()
-
-	// 2. Init Repositories
-	authorRepo := repositories.NewAuthorRepository(db)
-	bookRepo := repositories.NewBookRepository(db)
-	reviewRepo := repositories.NewReviewRepository(db)
-
-	// 3. Init Services (inject repo dependencies)
-	authorService := services.NewAuthorService(authorRepo)
-	bookService := services.NewBookService(bookRepo, authorRepo)
-	reviewService := services.NewReviewService(reviewRepo, bookRepo)
-
-	// 4. Init Handlers
-	authorHandler := handlers.NewAuthorHandler(authorService)
-	bookHandler := handlers.NewBookHandler(bookService)
-	reviewHandler := handlers.NewReviewHandler(reviewService)
-
-	// 5. Setup Router
+func NewRouter(
+	authorHandler *handlers.AuthorHandler,
+	bookHandler *handlers.BookHandler,
+	reviewHandler *handlers.ReviewHandler,
+) *gin.Engine {
 	r := gin.Default()
 	r.Use(gin.Recovery())
 	r.Use(cors.New(cors.Config{
@@ -46,7 +26,6 @@ func main() {
 
 	api := r.Group("/api/v1")
 	{
-		// Authors
 		authors := api.Group("/authors")
 		{
 			authors.GET("", authorHandler.GetAll)
@@ -56,10 +35,9 @@ func main() {
 			authors.DELETE("/:id", authorHandler.Delete)
 		}
 
-		// Books
 		books := api.Group("/books")
 		{
-			books.GET("", bookHandler.GetAll) // GET /books?author_id=1 juga bisa
+			books.GET("", bookHandler.GetAll)
 			books.GET("/explorer", bookHandler.GetExplorer)
 			books.GET("/:id", bookHandler.GetByID)
 			books.POST("", bookHandler.Create)
@@ -67,10 +45,9 @@ func main() {
 			books.DELETE("/:id", bookHandler.Delete)
 		}
 
-		// Reviews
 		reviews := api.Group("/reviews")
 		{
-			reviews.GET("", reviewHandler.GetAll) // GET /reviews?book_id=1 juga bisa
+			reviews.GET("", reviewHandler.GetAll)
 			reviews.GET("/:id", reviewHandler.GetByID)
 			reviews.POST("", reviewHandler.Create)
 			reviews.PUT("/:id", reviewHandler.Update)
@@ -78,14 +55,10 @@ func main() {
 		}
 	}
 
-	log.Println("Server running on :8080")
-	if err := r.Run(":8080"); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
-	}
+	return r
 }
 
 func getAllowedOrigins() []string {
-	// Default aman untuk local dev kalau env belum diset
 	defaultOrigins := []string{
 		"http://localhost:3000",
 		"http://localhost:3001",

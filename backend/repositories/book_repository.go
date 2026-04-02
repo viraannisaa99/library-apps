@@ -5,32 +5,22 @@ import (
 	"github.com/vira/go-crud/entities"
 )
 
-type BookRepository interface {
-	FindAll() ([]entities.Book, error)
-	FindByID(id int) (*entities.Book, error)
-	FindByAuthorID(authorID int) ([]entities.Book, error)
-	FindExplorer(authorID int, minRating float64) ([]entities.BookExplorer, error)
-	Create(req entities.CreateBookRequest) (*entities.Book, error)
-	Update(id int, req entities.UpdateBookRequest) (*entities.Book, error)
-	Delete(id int) error
-}
-
-type bookRepository struct {
+type BookRepository struct {
 	db *sqlx.DB
 }
 
-func NewBookRepository(db *sqlx.DB) BookRepository {
-	return &bookRepository{db}
+func NewBookRepository(db *sqlx.DB) *BookRepository {
+	return &BookRepository{db}
 }
 
-func (r *bookRepository) FindAll() ([]entities.Book, error) {
+func (r *BookRepository) GetAll() ([]entities.Book, error) {
 	books := []entities.Book{}
 	query := `SELECT * FROM books ORDER BY id`
 	err := r.db.Select(&books, query)
 	return books, err
 }
 
-func (r *bookRepository) FindByID(id int) (*entities.Book, error) {
+func (r *BookRepository) GetByID(id int) (*entities.Book, error) {
 	book := &entities.Book{}
 	query := `SELECT * FROM books WHERE id = $1`
 	err := r.db.Get(book, query, id)
@@ -40,14 +30,14 @@ func (r *bookRepository) FindByID(id int) (*entities.Book, error) {
 	return book, nil
 }
 
-func (r *bookRepository) FindByAuthorID(authorID int) ([]entities.Book, error) {
+func (r *BookRepository) GetByAuthorID(authorID int) ([]entities.Book, error) {
 	books := []entities.Book{}
 	query := `SELECT * FROM books WHERE author_id = $1 ORDER BY id`
 	err := r.db.Select(&books, query, authorID)
 	return books, err
 }
 
-func (r *bookRepository) FindExplorer(authorID int, minRating float64) ([]entities.BookExplorer, error) {
+func (r *BookRepository) GetExplorer(authorID int, minRating float64) ([]entities.BookExplorer, error) {
 	items := []entities.BookExplorer{}
 	query := `
 		SELECT
@@ -71,7 +61,7 @@ func (r *bookRepository) FindExplorer(authorID int, minRating float64) ([]entiti
 	return items, err
 }
 
-func (r *bookRepository) Create(req entities.CreateBookRequest) (*entities.Book, error) {
+func (r *BookRepository) Create(req entities.CreateBookRequest) (*entities.Book, error) {
 	book := &entities.Book{}
 	query := `
 		INSERT INTO books (author_id, title, description, published_year)
@@ -81,7 +71,7 @@ func (r *bookRepository) Create(req entities.CreateBookRequest) (*entities.Book,
 	return book, err
 }
 
-func (r *bookRepository) Update(id int, req entities.UpdateBookRequest) (*entities.Book, error) {
+func (r *BookRepository) Update(id int, req entities.UpdateBookRequest) (*entities.Book, error) {
 	book := &entities.Book{}
 	query := `
 		UPDATE books
@@ -95,7 +85,7 @@ func (r *bookRepository) Update(id int, req entities.UpdateBookRequest) (*entiti
 	return book, err
 }
 
-func (r *bookRepository) Delete(id int) error {
+func (r *BookRepository) Delete(id int) error {
 	_, err := r.db.Exec(`DELETE FROM books WHERE id = $1`, id)
 	return err
 }

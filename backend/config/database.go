@@ -18,7 +18,7 @@ func NewDB() *sqlx.DB {
 		getEnv("DB_PASSWORD", "vira"),
 		getEnv("DB_NAME", "postgresdb"),
 		getEnv("DB_SSLMODE", "disable"),
-		getEnv("DB_SEARCH_PATH", "books"),
+		getEnv("DB_SEARCH_PATH", "public"),
 	)
 
 	db, err := sqlx.Connect("postgres", dsn)

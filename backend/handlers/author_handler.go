@@ -1,19 +1,21 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/vira/go-crud/entities"
+	"github.com/vira/go-crud/response"
 	"github.com/vira/go-crud/services"
+	"github.com/vira/go-crud/utils"
 )
 
 type AuthorHandler struct {
-	service services.AuthorService
+	service *services.AuthorService
 }
 
-func NewAuthorHandler(service services.AuthorService) *AuthorHandler {
+func NewAuthorHandler(service *services.AuthorService) *AuthorHandler {
 	return &AuthorHandler{service}
 }
 
@@ -21,85 +23,86 @@ func NewAuthorHandler(service services.AuthorService) *AuthorHandler {
 func (h *AuthorHandler) GetAll(c *gin.Context) {
 	authors, err := h.service.GetAll()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"data": authors})
+	response.RespondSuccess(c, http.StatusOK, authors)
 }
 
 // GET /authors/:id
 func (h *AuthorHandler) GetByID(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+	id, ok := utils.ParseIDParam(c)
+	if !ok {
 		return
 	}
 
 	author, err := h.service.GetByID(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		status := http.StatusInternalServerError
+		if errors.Is(err, services.ErrAuthorNotFound) {
+			status = http.StatusNotFound
+		}
+		response.RespondError(c, status, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"data": author})
+	response.RespondSuccess(c, http.StatusOK, author)
 }
 
 // POST /authors
 func (h *AuthorHandler) Create(c *gin.Context) {
 	var req entities.CreateAuthorRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	author, err := h.service.Create(req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"data": author})
+	response.RespondSuccess(c, http.StatusCreated, author)
 }
 
 // PUT /authors/:id
 func (h *AuthorHandler) Update(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+	id, ok := utils.ParseIDParam(c)
+	if !ok {
 		return
 	}
 
 	var req entities.UpdateAuthorRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	author, err := h.service.Update(id, req)
 	if err != nil {
 		status := http.StatusInternalServerError
-		if err.Error() == "author not found" {
+		if errors.Is(err, services.ErrAuthorNotFound) {
 			status = http.StatusNotFound
 		}
-		c.JSON(status, gin.H{"error": err.Error()})
+		response.RespondError(c, status, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"data": author})
+	response.RespondSuccess(c, http.StatusOK, author)
 }
 
 // DELETE /authors/:id
 func (h *AuthorHandler) Delete(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+	id, ok := utils.ParseIDParam(c)
+	if !ok {
 		return
 	}
 
 	if err := h.service.Delete(id); err != nil {
 		status := http.StatusInternalServerError
-		if err.Error() == "author not found" {
+		if errors.Is(err, services.ErrAuthorNotFound) {
 			status = http.StatusNotFound
 		}
-		c.JSON(status, gin.H{"error": err.Error()})
+		response.RespondError(c, status, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "author deleted"})
+	response.RespondSuccess(c, http.StatusOK, "author deleted")
 }

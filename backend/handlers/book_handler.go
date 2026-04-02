@@ -1,19 +1,22 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/vira/go-crud/entities"
+	"github.com/vira/go-crud/response"
 	"github.com/vira/go-crud/services"
+	"github.com/vira/go-crud/utils"
 )
 
 type BookHandler struct {
-	service services.BookService
+	service *services.BookService
 }
 
-func NewBookHandler(service services.BookService) *BookHandler {
+func NewBookHandler(service *services.BookService) *BookHandler {
 	return &BookHandler{service}
 }
 
@@ -23,28 +26,28 @@ func (h *BookHandler) GetAll(c *gin.Context) {
 	if authorIDStr := c.Query("author_id"); authorIDStr != "" {
 		authorID, err := strconv.Atoi(authorIDStr)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid author_id"})
+			response.RespondError(c, http.StatusBadRequest, "invalid author_id")
 			return
 		}
 		books, err := h.service.GetByAuthorID(authorID)
 		if err != nil {
 			status := http.StatusInternalServerError
-			if err.Error() == "author not found" {
+			if errors.Is(err, services.ErrAuthorNotFound) {
 				status = http.StatusNotFound
 			}
-			c.JSON(status, gin.H{"error": err.Error()})
+			response.RespondError(c, status, err.Error())
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"data": books})
+		response.RespondSuccess(c, http.StatusOK, books)
 		return
 	}
 
 	books, err := h.service.GetAll()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"data": books})
+	response.RespondSuccess(c, http.StatusOK, books)
 }
 
 // GET /books/explorer
@@ -55,7 +58,7 @@ func (h *BookHandler) GetExplorer(c *gin.Context) {
 	if authorIDStr := c.Query("author_id"); authorIDStr != "" {
 		parsedAuthorID, err := strconv.Atoi(authorIDStr)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid author_id"})
+			response.RespondError(c, http.StatusBadRequest, "invalid author_id")
 			return
 		}
 		authorID = parsedAuthorID
@@ -64,7 +67,7 @@ func (h *BookHandler) GetExplorer(c *gin.Context) {
 	if minRatingStr := c.Query("min_rating"); minRatingStr != "" {
 		parsedMinRating, err := strconv.ParseFloat(minRatingStr, 64)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid min_rating"})
+			response.RespondError(c, http.StatusBadRequest, "invalid min_rating")
 			return
 		}
 		minRating = parsedMinRating
@@ -73,96 +76,97 @@ func (h *BookHandler) GetExplorer(c *gin.Context) {
 	items, err := h.service.GetExplorer(authorID, minRating)
 	if err != nil {
 		status := http.StatusInternalServerError
-		if err.Error() == "author not found" {
+		switch {
+		case errors.Is(err, services.ErrAuthorNotFound):
 			status = http.StatusNotFound
-		}
-		if err.Error() == "min_rating must be between 0 and 5" {
+		case errors.Is(err, services.ErrInvalidMinRating):
 			status = http.StatusBadRequest
 		}
-		c.JSON(status, gin.H{"error": err.Error()})
+		response.RespondError(c, status, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": items})
+	response.RespondSuccess(c, http.StatusOK, items)
 }
 
 // GET /books/:id
 func (h *BookHandler) GetByID(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+	id, ok := utils.ParseIDParam(c)
+	if !ok {
 		return
 	}
 
 	book, err := h.service.GetByID(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		status := http.StatusInternalServerError
+		if errors.Is(err, services.ErrBookNotFound) {
+			status = http.StatusNotFound
+		}
+		response.RespondError(c, status, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"data": book})
+	response.RespondSuccess(c, http.StatusOK, book)
 }
 
 // POST /books
 func (h *BookHandler) Create(c *gin.Context) {
 	var req entities.CreateBookRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	book, err := h.service.Create(req)
 	if err != nil {
 		status := http.StatusInternalServerError
-		if err.Error() == "author not found" {
+		if errors.Is(err, services.ErrAuthorNotFound) {
 			status = http.StatusNotFound
 		}
-		c.JSON(status, gin.H{"error": err.Error()})
+		response.RespondError(c, status, err.Error())
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"data": book})
+	response.RespondSuccess(c, http.StatusCreated, book)
 }
 
 // PUT /books/:id
 func (h *BookHandler) Update(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+	id, ok := utils.ParseIDParam(c)
+	if !ok {
 		return
 	}
 
 	var req entities.UpdateBookRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	book, err := h.service.Update(id, req)
 	if err != nil {
 		status := http.StatusInternalServerError
-		if err.Error() == "book not found" {
+		if errors.Is(err, services.ErrBookNotFound) {
 			status = http.StatusNotFound
 		}
-		c.JSON(status, gin.H{"error": err.Error()})
+		response.RespondError(c, status, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"data": book})
+	response.RespondSuccess(c, http.StatusOK, book)
 }
 
 // DELETE /books/:id
 func (h *BookHandler) Delete(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+	id, ok := utils.ParseIDParam(c)
+	if !ok {
 		return
 	}
 
 	if err := h.service.Delete(id); err != nil {
 		status := http.StatusInternalServerError
-		if err.Error() == "book not found" {
+		if errors.Is(err, services.ErrBookNotFound) {
 			status = http.StatusNotFound
 		}
-		c.JSON(status, gin.H{"error": err.Error()})
+		response.RespondError(c, status, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "book deleted"})
+	response.RespondSuccess(c, http.StatusOK, "book deleted")
 }
